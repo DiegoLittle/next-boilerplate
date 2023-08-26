@@ -1,0 +1,46 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://prisma:prisma@db:5432/nextjs-prisma?schema=public
+      - NEXT_PUBLIC_API_BASE_URL=https://yourdomain.com
+
+  db:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_USER: prisma
+      POSTGRES_PASSWORD: prisma
+      POSTGRES_DB: nextjs-prisma
+    volumes:
+      - db-data:/var/lib/postgresql/data
+
+  nginx:
+    build: ./nginx
+    ports:
+      - '80:80'
+      - '443:443'
+    depends_on:
+      - app
+    volumes:
+      - certbot-data:/etc/letsencrypt
+      - certbot-logs:/var/log/letsencrypt
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+
+  certbot:
+    build: ./certbot
+    depends_on:
+      - nginx
+    volumes:
+      - certbot-data:/etc/letsencrypt
+      - certbot-logs:/var/log/letsencrypt
+    command: "certbot renew --webroot -w /var/www/certbot --deploy-hook \"nginx -s reload\""
+
+volumes:
+  db-data:
+  certbot-data:
+  certbot-logs:
